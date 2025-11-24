@@ -1,32 +1,38 @@
-import reset from "./commands/reset";
-import register from "./commands/register";
-import users from "./commands/users";
+import register from './commands/register';
+import { addFeed } from './commands/addfeed';
+import { feeds } from './lib/feeds';
+import reset from './commands/reset';
 
-const cmd = process.argv[2];
-const argv = process.argv.slice(3);
+type Command = (args?: string[]) => Promise<void>;
 
-async function main() {
-    try {
-        switch (cmd) {
-            case "reset":
-                await reset(argv);
-                break;
-            case "register":
-                await register(argv);
-                break;
-            case "users":
-                await users(argv);
-                break;
-            default:
-                console.error("Unknown command:", cmd ?? "(none)");
+async function main(): Promise<void> {
+    const [, , cmd, ...args] = process.argv;
+
+    switch (cmd) {
+        case 'register':
+            await register(args);
+            break;
+        case 'addfeed':
+            if (args.length < 3) {
+                console.error('Usage: addfeed <username> <feedName> <feedUrl>');
                 process.exitCode = 1;
-                setImmediate(() => process.exit(1));
-        }
-    } catch (err: any) {
-        console.error(err?.message ?? err);
-        process.exitCode = 1;
-        setImmediate(() => process.exit(1));
+                return;
+            }
+            await addFeed(args[0], args[1], args[2]);
+            break;
+        case 'feeds':
+            await feeds(args);
+            break;
+        case 'reset':
+            await reset(args);
+            break;
+        default:
+            console.error('Unknown command:', cmd);
+            process.exitCode = 1;
     }
 }
 
-main();
+main().catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+});
