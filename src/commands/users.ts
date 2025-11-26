@@ -1,44 +1,40 @@
-import { getUsers } from "../lib/db/getUsers";
+import { setUser, readConfig } from "../config";
+import { createUser, getUsers } from "../lib/db/queries/users";
 
-function toNumericId(id: unknown): number {
-    if (typeof id === "number") return id;
-    try {
-        const s = String(id);
-        if (/^\d+$/.test(s)) return parseInt(s, 10);
-        return Number(BigInt(s));
-    } catch {
-        return Number.NEGATIVE_INFINITY;
+export async function handlerLogin(cmdName: string, ...args: string[]) {
+    if (args.length !== 1) {
+        throw new Error(`usage: ${cmdName} <name>`);
     }
+
+    const userName = args[0];
+    setUser(userName);
+    console.log("User switched successfully!");
 }
 
-export default async function users(_: string[]): Promise<void> {
-    try {
-        const users = await getUsers();
-        users.sort((a, b) => a.name.localeCompare(b.name));
+export async function handlerRegister(cmdName: string, ...args: string[]) {
+    if (args.length != 1) {
+        throw new Error(`usage: ${cmdName} <name>`);
+    }
 
-        let current = "";
-        if (users.length > 0) {
-            const maxById = users.reduce((best, u) => {
-                if (!best) return u;
-                return toNumericId(u.id) > toNumericId(best.id) ? u : best;
-            }, users[0]);
-            current = maxById?.name ?? "";
+    const userName = args[0];
+    const user = await createUser(userName);
+    if (!user) {
+        throw new Error(`User ${userName} not found`);
+    }
+
+    setUser(user.name);
+    console.log("User created successfully!");
+}
+
+export async function handlerListUsers(_: string) {
+    const users = await getUsers();
+    const config = readConfig();
+
+    for (let user of users) {
+        if (user.name === config.currentUserName) {
+            console.log(`* ${user.name} (current)`);
+            continue;
         }
-
-        if (users.length === 0) {
-            console.log("(no users)");
-        } else {
-            for (const u of users) {
-                const isCurrent = u.name === current;
-                console.log(`* ${u.name}${isCurrent ? " (current)" : ""}`);
-            }
-        }
-
-        process.exitCode = 0;
-        setImmediate(() => process.exit(0));
-    } catch (err: any) {
-        console.error("Error in users:", err?.message ?? err);
-        process.exitCode = 1;
-        setImmediate(() => process.exit(1));
+        console.log(`* ${user.name}`);
     }
 }

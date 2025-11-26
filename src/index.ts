@@ -1,38 +1,48 @@
-import register from './commands/register';
-import { addFeed } from './commands/addfeed';
-import { feeds } from './lib/feeds';
-import reset from './commands/reset';
+import {
+    CommandsRegistry,
+    registerCommand,
+    runCommand,
+} from "./commands/commands";
+import {
+    handlerListUsers,
+    handlerLogin,
+    handlerRegister,
+} from "./commands/users";
+import { handlerReset } from "./commands/reset";
+import { handlerAgg } from "./commands/aggregate";
+import { handlerAddFeed, handlerListFeeds } from "./commands/feeds";
 
-type Command = (args?: string[]) => Promise<void>;
+async function main() {
+    const args = process.argv.slice(2);
 
-async function main(): Promise<void> {
-    const [, , cmd, ...args] = process.argv;
-
-    switch (cmd) {
-        case 'register':
-            await register(args);
-            break;
-        case 'addfeed':
-            if (args.length < 3) {
-                console.error('Usage: addfeed <username> <feedName> <feedUrl>');
-                process.exitCode = 1;
-                return;
-            }
-            await addFeed(args[0], args[1], args[2]);
-            break;
-        case 'feeds':
-            await feeds(args);
-            break;
-        case 'reset':
-            await reset(args);
-            break;
-        default:
-            console.error('Unknown command:', cmd);
-            process.exitCode = 1;
+    if (args.length < 1) {
+        console.log("usage: cli <command> [args...]");
+        process.exit(1);
     }
+
+    const cmdName = args[0];
+    const cmdArgs = args.slice(1);
+    const commandsRegistry: CommandsRegistry = {};
+
+    registerCommand(commandsRegistry, "login", handlerLogin);
+    registerCommand(commandsRegistry, "register", handlerRegister);
+    registerCommand(commandsRegistry, "reset", handlerReset);
+    registerCommand(commandsRegistry, "users", handlerListUsers);
+    registerCommand(commandsRegistry, "agg", handlerAgg);
+    registerCommand(commandsRegistry, "addfeed", handlerAddFeed);
+    registerCommand(commandsRegistry, "feeds", handlerListFeeds);
+
+    try {
+        await runCommand(commandsRegistry, cmdName, ...cmdArgs);
+    } catch (err) {
+        if (err instanceof Error) {
+            console.error(`Error running command ${cmdName}: ${err.message}`);
+        } else {
+            console.error(`Error running command ${cmdName}: ${err}`);
+        }
+        process.exit(1);
+    }
+    process.exit(0);
 }
 
-main().catch((err) => {
-    console.error(err);
-    process.exitCode = 1;
-});
+main();

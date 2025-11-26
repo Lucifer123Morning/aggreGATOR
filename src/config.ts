@@ -1,34 +1,60 @@
-import { existsSync, readFileSync, writeFileSync } from "fs";
-import { homedir } from "os";
-import { join } from "path";
+import fs from "fs";
+import os from "os";
+import path from "path";
 
-export interface GatorConfig {
-    db_url?: string;
-    currentUserName?: string;
+type Config = {
+    dbUrl: string;
+    currentUserName: string;
+};
+
+export function setUser(userName: string) {
+    const config = readConfig();
+    config.currentUserName = userName;
+    writeConfig(config);
 }
 
-const CONFIG_PATH = join(homedir(), ".gatorconfig.json");
-
-export function readConfig(): GatorConfig {
-    if (!existsSync(CONFIG_PATH)) {
-        const defaultCfg: GatorConfig = {
-            db_url: "postgres://postgres:postgres@localhost:5432/gator?sslmode=disable",
-            currentUserName: undefined,
-        };
-
-        writeFileSync(CONFIG_PATH, JSON.stringify(defaultCfg, null, 2));
-        return defaultCfg;
+function validateConfig(rawConfig: any) {
+    if (!rawConfig.db_url || typeof rawConfig.db_url !== "string") {
+        throw new Error("db_url is required in config file");
+    }
+    if (
+        !rawConfig.current_user_name ||
+        typeof rawConfig.current_user_name !== "string"
+    ) {
+        throw new Error("current_user_name is required in config file");
     }
 
-    return JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
+    const config: Config = {
+        dbUrl: rawConfig.db_url,
+        currentUserName: rawConfig.current_user_name,
+    };
+
+    return config;
 }
 
-export function writeConfig(cfg: GatorConfig) {
-    writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2));
+export function readConfig() {
+    const fullPath = getConfigFilePath();
+
+    const data = fs.readFileSync(fullPath, "utf-8");
+    const rawConfig = JSON.parse(data);
+
+    return validateConfig(rawConfig);
 }
 
-export function setUser(name: string) {
-    const cfg = readConfig();
-    cfg.currentUserName = name;
-    writeConfig(cfg);
+function getConfigFilePath() {
+    const configFileName = ".gatorconfig.json";
+    const homeDir = os.homedir();
+    return path.join(homeDir, configFileName);
+}
+
+function writeConfig(config: Config) {
+    const fullPath = getConfigFilePath();
+
+    const rawConfig = {
+        db_url: config.dbUrl,
+        current_user_name: config.currentUserName,
+    };
+
+    const data = JSON.stringify(rawConfig, null, 2);
+    fs.writeFileSync(fullPath, data, { encoding: "utf-8" });
 }
